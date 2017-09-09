@@ -9,7 +9,7 @@ namespace EastshadeStudio
 {
     public class PrefabStamper : EditorWindow
     {
-        static LayerMask terrainLayerMask = 1 << LayerMask.NameToLayer("Terrain"); // this needs to be different from stamped objects
+        static LayerMask targetLayer = 0 << 1;
 
         const string stampDataFolder = "/Text/Stamps/";
 
@@ -25,7 +25,7 @@ namespace EastshadeStudio
         float largest = 1.15f;
         static PrefabStamper instance;
 
-        [MenuItem("Tools/Prefab Stamper/Drop Selection to Terrain", false, 2)]
+        [MenuItem("Tools/LevelEditTools/Prefab Stamper/Drop Selection to Terrain", false, 2)]
         static void DropSelectedToTerrain()
         {
             Undo.RecordObjects(Selection.transforms, "Drop to Terrain");
@@ -34,14 +34,11 @@ namespace EastshadeStudio
 
         static void DropToTerrain(Transform[] toDrop)
         {
-
             foreach (Transform t in toDrop)
             {
-
                 RaycastHit hit;
-                if (Physics.Raycast(t.position + (Vector3.up * 7), Vector3.down, out hit, Mathf.Infinity, terrainLayerMask))
+                if (Physics.Raycast(t.position + (Vector3.up * 7), Vector3.down, out hit, Mathf.Infinity, 1 << targetLayer))
                 {
-
                     t.position = hit.point;
 
                     if (t.tag != "Trees")
@@ -53,10 +50,9 @@ namespace EastshadeStudio
                     }
                 }
             }
-
         }
 
-        [MenuItem("Tools/Prefab Stamper/Create Stamp from Selection", false, 0)]
+        [MenuItem("Tools/LevelEditTools/Prefab Stamper/Create Stamp from Selection", false, 0)]
         static void CreateStamp()
         {
             if (Selection.gameObjects.Length == 0)
@@ -129,7 +125,7 @@ namespace EastshadeStudio
         }
 
         [MenuItem("Assets/Stamp")]
-        static void Arm()
+        static void StartStamping()
         {
             Init();
             Object obj = Selection.activeObject;
@@ -148,7 +144,7 @@ namespace EastshadeStudio
         }
 
         [MenuItem("Assets/Stamp", true)]
-        static bool stampCheck()
+        static bool StampCheck()
         {
             Object candidate = Selection.activeObject;
 
@@ -181,12 +177,17 @@ namespace EastshadeStudio
 
         public static void Init()
         {
+            if (LayerMask.GetMask("Terrain") > 0)
+            {
+                targetLayer = LayerMask.NameToLayer("Terrain");
+            }
+
             // Get existing open window or if none, make a new one:
             PrefabStamper window = (PrefabStamper)GetWindow(typeof(PrefabStamper));
             window.Show();
             window.titleContent.text = "PrefabStamper";
-            window.minSize = new Vector2(238, 128);
-            window.maxSize = new Vector2(240, 130);
+            window.minSize = new Vector2(248, 148);
+            window.maxSize = new Vector2(250, 150);
             instance = window;
         }
 
@@ -205,8 +206,12 @@ namespace EastshadeStudio
             {
                 instance = (PrefabStamper)GetWindow(typeof(PrefabStamper));
             }
+
+            targetLayer = EditorGUILayout.LayerField("Target layer", targetLayer);
+
             useNormal = EditorGUILayout.Toggle("Use Normal", useNormal);
             randomYRot = EditorGUILayout.Toggle("Randomize Y Rotation", randomYRot);
+
             sizeVariation = EditorGUILayout.Toggle("Randomize Scale", sizeVariation);
             if (sizeVariation == true)
             {
@@ -226,7 +231,6 @@ namespace EastshadeStudio
         // main loop
         static void OnScene(SceneView sceneview)
         {
-
             if (Event.current.alt) // lat key is down
             {
                 return;
@@ -256,16 +260,15 @@ namespace EastshadeStudio
             }
 
             if (Event.current.type == EventType.Layout)
-            { // stop stuff from selecting
+            { // stop selecting objects
                 HandleUtility.AddDefaultControl(0);
             }
         }
 
         static void UpdateStamped()
         {
-
+            // rotate with scrollwheel
             float scroll = (Event.current.type == EventType.scrollWheel) ? Event.current.delta.y * 4f : 0f;
-
             if (Event.current.type == EventType.scrollWheel)
             {
                 Event.current.Use();
@@ -278,10 +281,9 @@ namespace EastshadeStudio
 
             Vector2 guiPosition = Event.current.mousePosition;
             Ray ray = HandleUtility.GUIPointToWorldRay(guiPosition);
-            //Physics.Raycast(ray); //?
 
             RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, terrainLayerMask))
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity, 1 << targetLayer))
             {
                 foreach (Transform t in instance.stampedTransforms)
                 {
@@ -298,19 +300,19 @@ namespace EastshadeStudio
 
         static void LayStamp()
         {
-
             Undo.IncrementCurrentGroup();
 
             GameObject newStampsGroup = GameObject.Find("new stamps");
             if (newStampsGroup == null || newStampsGroup.transform.root != newStampsGroup.transform)
+            {
                 newStampsGroup = new GameObject("new stamps");
+            }
 
             Vector2 guiPosition = Event.current.mousePosition;
             Ray ray = HandleUtility.GUIPointToWorldRay(guiPosition);
-            Physics.Raycast(ray);
 
             RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, terrainLayerMask))
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity, 1 << targetLayer) == true)
             {
                 instance.lastHitPoint = hit.point;
                 instance.lastHitNormal = hit.normal;
