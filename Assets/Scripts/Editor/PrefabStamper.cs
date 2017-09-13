@@ -19,7 +19,7 @@ namespace EastshadeStudio
 
         Vector3 lastHitPoint;
         Vector3 lastHitNormal;
-        bool useNormal = true;
+        bool alignToNormal = true;
         bool randomYRot = true;
         bool sizeVariation = true;
         float smallest = .85f;
@@ -99,8 +99,8 @@ namespace EastshadeStudio
             PrefabStamper window = (PrefabStamper)GetWindow(typeof(PrefabStamper));
             window.Show();
             window.titleContent.text = "PrefabStamper";
-            window.minSize = new Vector2(248, 168);
-            window.maxSize = new Vector2(250, 170);
+            window.minSize = new Vector2(248, 188);
+            window.maxSize = new Vector2(250, 190);
             instance = window;
         }
 
@@ -113,6 +113,7 @@ namespace EastshadeStudio
             SceneView.onSceneGUIDelegate -= OnScene;
         }
 
+        // editor gui window
         void OnGUI()
         {
             if (instance == null)
@@ -126,18 +127,21 @@ namespace EastshadeStudio
 
             targetLayer = EditorGUILayout.LayerField("Target layer", targetLayer);
 
-            useNormal = EditorGUILayout.Toggle("Use Normal", useNormal);
+            alignToNormal = EditorGUILayout.Toggle("Align to Normal", alignToNormal);
             randomYRot = EditorGUILayout.Toggle("Randomize Y Rotation", randomYRot);
 
             sizeVariation = EditorGUILayout.Toggle("Randomize Scale", sizeVariation);
-            if (sizeVariation == true)
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Smallest/Largest", GUILayout.MaxWidth(120));
-                smallest = EditorGUILayout.FloatField(smallest);
-                largest = EditorGUILayout.FloatField(largest);
-                EditorGUILayout.EndHorizontal();
-            }
+
+            GUI.enabled = sizeVariation;
+            Rect r = EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Min " + smallest.ToString());
+            GUILayout.FlexibleSpace();
+            GUILayout.Label(largest.ToString() + " Max");
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.MinMaxSlider(ref smallest, ref largest, 0.25f, 2.0f);
+
+            GUI.enabled = true;
 
             if (GUILayout.Button("Done", GUILayout.MinHeight(30)))
             {
@@ -162,6 +166,19 @@ namespace EastshadeStudio
 
             if (instance.Stamp == null) return;
 
+            // get raycast hit for preview circle
+            Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+            RaycastHit hit;
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity, 1 << targetLayer))
+            {
+                Handles.color = Color.blue;
+                // FIXME not accurate radius/area
+                Handles.DrawWireDisc(hit.point, hit.normal, instance.Stamp.bounds.extents.magnitude * 0.5f);
+                //Handles.DrawWireCube(hit.point, instance.Stamp.bounds.size);
+                HandleUtility.Repaint();
+            }
+
+            // left mouse button is down
             if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
             {
                 PaintStamp();
@@ -173,13 +190,15 @@ namespace EastshadeStudio
                 instance.stampedTransforms.Clear();
             }
 
+            // move stamp with mouse
             if (instance.stampedTransforms.Count > 0)
             {
                 UpdateStamper();
             }
 
+            // stops selecting other objects
             if (Event.current.type == EventType.Layout)
-            { // stop selecting objects
+            {
                 HandleUtility.AddDefaultControl(0);
             }
         }
@@ -197,28 +216,22 @@ namespace EastshadeStudio
                 t.RotateAround(instance.lastHitPoint, instance.lastHitNormal, scroll);
             }
 
-            Vector2 guiPosition = Event.current.mousePosition;
-            Ray ray = HandleUtility.GUIPointToWorldRay(guiPosition);
+            Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
             RaycastHit hit;
             if (Physics.Raycast(ray, out hit, Mathf.Infinity, 1 << targetLayer))
             {
-                foreach (Transform t in instance.stampedTransforms)
                 {
-                    t.position += hit.point - instance.lastHitPoint;
+                    foreach (Transform t in instance.stampedTransforms)
+                    {
+                        t.position += hit.point - instance.lastHitPoint;
+                    }
+
+                    instance.lastHitPoint = hit.point;
+                    instance.lastHitNormal = hit.normal;
                 }
-
-                instance.lastHitPoint = hit.point;
-                instance.lastHitNormal = hit.normal;
-
-                // preview circle
-                Handles.color = Color.blue;
-                Handles.DrawWireDisc(hit.point, hit.normal, instance.Stamp.bounds.extents.magnitude * 0.5f);
-                //Handles.DrawWireCube(hit.point, instance.Stamp.bounds.size);
-                HandleUtility.Repaint();
+                DropToTerrain(instance.stampedTransforms.ToArray());
             }
-            DropToTerrain(instance.stampedTransforms.ToArray());
         }
-
 
         static void PaintStamp()
         {
