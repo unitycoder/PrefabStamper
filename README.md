@@ -1,3 +1,7 @@
+# MERGED & LATEST UPDATES HERE https://github.com/unitycoder/UnityLevelDesignToolkit 
+
+-----------------^-----------------
+
 # PrefabStamper
 Prefab Stamper Editor Tool by EastshadeStudios https://twitter.com/eastshade
 
